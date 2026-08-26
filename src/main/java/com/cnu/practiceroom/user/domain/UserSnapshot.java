@@ -1,4 +1,4 @@
-package com.cnu.practiceroom.reservation.domain;
+package com.cnu.practiceroom.user.domain;
 
 import java.util.Set;
 

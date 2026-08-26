@@ -1,5 +1,7 @@
 package com.cnu.practiceroom.reservation.domain;
 
+import com.cnu.practiceroom.user.domain.UserRole;
+import com.cnu.practiceroom.user.domain.UserSnapshot;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

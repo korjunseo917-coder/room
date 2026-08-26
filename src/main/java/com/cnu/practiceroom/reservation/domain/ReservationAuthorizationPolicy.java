@@ -1,5 +1,8 @@
 package com.cnu.practiceroom.reservation.domain;
 
+import com.cnu.practiceroom.user.domain.UserRole;
+import com.cnu.practiceroom.user.domain.UserSnapshot;
+
 import java.util.Objects;
 
 public final class ReservationAuthorizationPolicy {
