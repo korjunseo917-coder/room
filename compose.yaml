@@ -1,0 +1,33 @@
+name: practice-room
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: practice-room-postgres
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    command:
+      - postgres
+      - -c
+      - timezone=Asia/Seoul
+
+    ports:
+      - "127.0.0.1:5432:5432"
+
+    volumes:
+      - postgres-data:/var/lib/postgresql
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U practice_user -d practice_room
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
