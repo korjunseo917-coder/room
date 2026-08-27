@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -291,6 +292,102 @@ class ReservationPolicyTest {
         assertEquals(
                 120L,
                 result.get(YearMonth.of(2026, 10))
+        );
+    }
+
+    @Test
+    @DisplayName("설정된 최대 이용시간을 사용한다")
+    void usesConfiguredMaximumDuration() {
+        ReservationPolicy customPolicy =
+                new ReservationPolicy(
+                        new ReservationPolicySettings(
+                                60,
+                                120,
+                                LocalTime.of(7, 0),
+                                5,
+                                LocalTime.of(20, 0),
+                                LocalTime.of(22, 0)
+                        )
+                );
+
+        assertDoesNotThrow(
+                () -> customPolicy.validateTimeRange(
+                        at(2026, 9, 15, 18, 0, 0),
+                        at(2026, 9, 15, 20, 0, 0)
+                )
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> customPolicy.validateTimeRange(
+                        at(2026, 9, 15, 18, 0, 0),
+                        at(2026, 9, 15, 21, 0, 0)
+                )
+        );
+    }
+
+    @Test
+    @DisplayName("설정된 예약 단위 경계를 사용한다")
+    void usesConfiguredSlotBoundary() {
+        ReservationPolicy customPolicy =
+                new ReservationPolicy(
+                        new ReservationPolicySettings(
+                                30,
+                                180,
+                                LocalTime.of(7, 0),
+                                5,
+                                LocalTime.of(20, 0),
+                                LocalTime.of(22, 0)
+                        )
+                );
+
+        assertDoesNotThrow(
+                () -> customPolicy.validateTimeRange(
+                        at(2026, 9, 15, 18, 0, 0),
+                        at(2026, 9, 15, 18, 30, 0)
+                )
+        );
+    }
+
+    @Test
+    @DisplayName("설정된 운영일 시작 시각을 사용한다")
+    void usesConfiguredOperationalDayStart() {
+        ReservationPolicy customPolicy =
+                new ReservationPolicy(
+                        new ReservationPolicySettings(
+                                60,
+                                180,
+                                LocalTime.of(6, 0),
+                                5,
+                                LocalTime.of(20, 0),
+                                LocalTime.of(22, 0)
+                        )
+                );
+
+        LocalDate result =
+                customPolicy.calculateOperationalDate(
+                        at(2026, 10, 1, 6, 0, 0)
+                );
+
+        assertEquals(
+                LocalDate.of(2026, 10, 1),
+                result
+        );
+    }
+
+    @Test
+    @DisplayName("최대 이용시간은 예약 단위로 나누어져야 한다")
+    void rejectsMaximumDurationNotDivisibleBySlot() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new ReservationPolicySettings(
+                        60,
+                        150,
+                        LocalTime.of(7, 0),
+                        5,
+                        LocalTime.of(20, 0),
+                        LocalTime.of(22, 0)
+                )
         );
     }
 

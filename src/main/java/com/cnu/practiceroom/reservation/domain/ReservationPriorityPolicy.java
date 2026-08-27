@@ -68,6 +68,84 @@ public final class ReservationPriorityPolicy {
         );
     }
 
+    public ReservationPriorityDecision decideNewRequest(
+            ReservationRequestSnapshot newReservation,
+            List<ReservationSnapshot> existingReservations
+    ) {
+        if (newReservation == null) {
+            throw new IllegalArgumentException(
+                    "신규 예약 신청은 필수입니다."
+            );
+        }
+
+        if (existingReservations == null) {
+            throw new IllegalArgumentException(
+                    "기존 예약 목록은 필수입니다."
+            );
+        }
+
+        List<ReservationSnapshot> conflicts =
+                new ArrayList<>();
+
+        for (ReservationSnapshot existingReservation
+                : existingReservations) {
+
+            if (existingReservation == null) {
+                continue;
+            }
+
+            if (!existingReservation.isActive()) {
+                continue;
+            }
+
+            if (existingReservation.roomId()
+                    != newReservation.roomId()) {
+                continue;
+            }
+
+            boolean overlaps =
+                    newReservation.start()
+                            .isBefore(existingReservation.end())
+                            && existingReservation.start()
+                            .isBefore(newReservation.end());
+
+            if (overlaps) {
+                conflicts.add(existingReservation);
+            }
+        }
+
+        if (conflicts.isEmpty()) {
+            return ReservationPriorityDecision.allow();
+        }
+
+        if (newReservation.type()
+                == ReservationType.STANDBY) {
+
+            return ReservationPriorityDecision.reject();
+        }
+
+        boolean hasRegularConflict =
+                conflicts.stream()
+                        .anyMatch(
+                                reservation ->
+                                        reservation.type()
+                                                == ReservationType.REGULAR
+                        );
+
+        if (hasRegularConflict) {
+            return ReservationPriorityDecision.reject();
+        }
+
+        List<Long> displacedReservationIds =
+                conflicts.stream()
+                        .map(ReservationSnapshot::id)
+                        .toList();
+
+        return ReservationPriorityDecision.displace(
+                displacedReservationIds
+        );
+    }
+
     public boolean canRestore(
             ReservationSnapshot displacedReservation,
             List<ReservationSnapshot> activeReservations,

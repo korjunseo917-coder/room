@@ -14,19 +14,23 @@ public final class ReservationPolicy {
     private static final ZoneId SEOUL =
             ZoneId.of("Asia/Seoul");
 
-    private static final long SLOT_MINUTES = 60;
-    private static final long MAX_DURATION_MINUTES = 180;
+    private final ReservationPolicySettings settings;
 
-    private static final LocalTime OPERATIONAL_DAY_START =
-            LocalTime.of(7, 0);
+    public ReservationPolicy() {
+        this(ReservationPolicySettings.standard());
+    }
 
-    private static final long MONTHLY_OPEN_DAYS_BEFORE = 5;
+    public ReservationPolicy(
+            ReservationPolicySettings settings
+    ) {
+        if (settings == null) {
+            throw new IllegalArgumentException(
+                    "예약 정책 설정은 필수입니다."
+            );
+        }
 
-    private static final LocalTime MONTHLY_OPEN_TIME =
-            LocalTime.of(20, 0);
-
-    private static final LocalTime APPLICATION_DEADLINE_TIME =
-            LocalTime.of(22, 0);
+        this.settings = settings;
+    }
 
     public void validateTimeRange(
             ZonedDateTime start,
@@ -50,10 +54,10 @@ public final class ReservationPolicy {
             );
         }
 
-        if (!isOnTheHour(seoulStart)
-                || !isOnTheHour(seoulEnd)) {
+        if (!isOnSlotBoundary(seoulStart)
+                || !isOnSlotBoundary(seoulEnd)) {
             throw new IllegalArgumentException(
-                    "예약은 정각을 기준으로 신청해야 합니다."
+                    "시작과 종료 시각은 예약 단위 경계와 일치해야 합니다."
             );
         }
 
@@ -61,15 +65,20 @@ public final class ReservationPolicy {
                 Duration.between(seoulStart, seoulEnd)
                         .toMinutes();
 
-        if (durationMinutes % SLOT_MINUTES != 0) {
+        if (durationMinutes % settings.slotMinutes() != 0) {
             throw new IllegalArgumentException(
-                    "예약은 1시간 단위여야 합니다."
+                    "예약은 "
+                            + settings.slotMinutes()
+                            + "분 단위여야 합니다."
             );
         }
 
-        if (durationMinutes > MAX_DURATION_MINUTES) {
+        if (durationMinutes
+                > settings.maxDurationMinutes()) {
             throw new IllegalArgumentException(
-                    "예약은 최대 3시간까지 가능합니다."
+                    "예약은 최대 "
+                            + settings.maxDurationMinutes()
+                            + "분까지 가능합니다."
             );
         }
     }
@@ -92,7 +101,9 @@ public final class ReservationPolicy {
         LocalTime calendarTime =
                 seoulDateTime.toLocalTime();
 
-        if (calendarTime.isBefore(OPERATIONAL_DAY_START)) {
+        if (calendarTime.isBefore(
+                settings.operationalDayStart()
+        )) {
             return calendarDate.minusDays(1);
         }
 
@@ -119,10 +130,12 @@ public final class ReservationPolicy {
 
         LocalDate openDate = operationalMonth
                 .atDay(1)
-                .minusDays(MONTHLY_OPEN_DAYS_BEFORE);
+                .minusDays(
+                        settings.monthlyOpenDaysBefore()
+                );
 
         return openDate
-                .atTime(MONTHLY_OPEN_TIME)
+                .atTime(settings.monthlyOpenTime())
                 .atZone(SEOUL);
     }
 
@@ -145,14 +158,18 @@ public final class ReservationPolicy {
                     calculateOperationalMonth(cursor);
 
             ZonedDateTime monthlyOpenAt =
-                    calculateMonthlyOpenAt(operationalMonth);
+                    calculateMonthlyOpenAt(
+                            operationalMonth
+                    );
 
             if (latestOpenAt == null
                     || monthlyOpenAt.isAfter(latestOpenAt)) {
                 latestOpenAt = monthlyOpenAt;
             }
 
-            cursor = cursor.plusMinutes(SLOT_MINUTES);
+            cursor = cursor.plusMinutes(
+                    settings.slotMinutes()
+            );
         }
 
         return latestOpenAt;
@@ -166,7 +183,9 @@ public final class ReservationPolicy {
 
         return operationalDate
                 .minusDays(1)
-                .atTime(APPLICATION_DEADLINE_TIME)
+                .atTime(
+                        settings.applicationDeadlineTime()
+                )
                 .atZone(SEOUL);
     }
 
@@ -227,21 +246,31 @@ public final class ReservationPolicy {
 
             usageMinutes.merge(
                     operationalMonth,
-                    SLOT_MINUTES,
+                    settings.slotMinutes(),
                     Long::sum
             );
 
-            cursor = cursor.plusMinutes(SLOT_MINUTES);
+            cursor = cursor.plusMinutes(
+                    settings.slotMinutes()
+            );
         }
 
         return Map.copyOf(usageMinutes);
     }
 
-    private boolean isOnTheHour(
+    private boolean isOnSlotBoundary(
             ZonedDateTime dateTime
     ) {
-        return dateTime.getMinute() == 0
-                && dateTime.getSecond() == 0
-                && dateTime.getNano() == 0;
+        if (dateTime.getSecond() != 0
+                || dateTime.getNano() != 0) {
+            return false;
+        }
+
+        long minuteOfDay =
+                dateTime.getHour() * 60L
+                        + dateTime.getMinute();
+
+        return minuteOfDay
+                % settings.slotMinutes() == 0;
     }
 }
