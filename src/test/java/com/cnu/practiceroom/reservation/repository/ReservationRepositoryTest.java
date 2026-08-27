@@ -3,6 +3,7 @@ package com.cnu.practiceroom.reservation.repository;
 import com.cnu.practiceroom.club.domain.Club;
 import com.cnu.practiceroom.club.repository.ClubRepository;
 import com.cnu.practiceroom.reservation.domain.Reservation;
+import com.cnu.practiceroom.reservation.domain.ReservationPolicy;
 import com.cnu.practiceroom.reservation.domain.ReservationStatus;
 import com.cnu.practiceroom.reservation.domain.ReservationType;
 import com.cnu.practiceroom.room.domain.Room;
@@ -34,6 +35,15 @@ class ReservationRepositoryTest {
     private static final ZoneId SEOUL =
             ZoneId.of("Asia/Seoul");
 
+    /*
+     * 현재 운영 규칙이 들어 있는 기본 예약 정책이다.
+     *
+     * Reservation이 정책을 직접 생성하지 않고,
+     * 예약을 만드는 쪽에서 정책을 전달한다.
+     */
+    private final ReservationPolicy reservationPolicy =
+            new ReservationPolicy();
+
     @Autowired
     private ReservationRepository reservationRepository;
 
@@ -61,7 +71,8 @@ class ReservationRepositoryTest {
                         room,
                         ReservationType.REGULAR,
                         time(2026, 9, 30, 23),
-                        time(2026, 10, 1, 2)
+                        time(2026, 10, 1, 2),
+                        reservationPolicy
                 )
         );
 
@@ -102,7 +113,8 @@ class ReservationRepositoryTest {
                         room,
                         ReservationType.STANDBY,
                         time(2026, 11, 10, 10),
-                        time(2026, 11, 10, 12)
+                        time(2026, 11, 10, 12),
+                        reservationPolicy
                 )
         );
 
@@ -111,7 +123,8 @@ class ReservationRepositoryTest {
                 room,
                 ReservationType.STANDBY,
                 time(2026, 11, 10, 11),
-                time(2026, 11, 10, 13)
+                time(2026, 11, 10, 13),
+                reservationPolicy
         );
 
         assertThatThrownBy(

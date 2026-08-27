@@ -4,6 +4,7 @@ import com.cnu.practiceroom.club.domain.Club;
 import com.cnu.practiceroom.club.repository.ClubRepository;
 import com.cnu.practiceroom.reservation.domain.ClubMonthlyQuota;
 import com.cnu.practiceroom.reservation.domain.Reservation;
+import com.cnu.practiceroom.reservation.domain.ReservationPolicy;
 import com.cnu.practiceroom.reservation.domain.ReservationType;
 import com.cnu.practiceroom.room.domain.Room;
 import com.cnu.practiceroom.room.repository.RoomRepository;
@@ -32,6 +33,15 @@ class MonthlyQuotaPersistenceTest {
 
     private static final ZoneId SEOUL =
             ZoneId.of("Asia/Seoul");
+
+    /*
+     * 현재 운영 규칙이 들어 있는 기본 예약 정책이다.
+     *
+     * Reservation이 정책을 직접 생성하지 않고,
+     * 예약을 만드는 쪽에서 정책을 전달한다.
+     */
+    private final ReservationPolicy reservationPolicy =
+            new ReservationPolicy();
 
     @Autowired
     private ClubRepository clubRepository;
@@ -101,7 +111,8 @@ class MonthlyQuotaPersistenceTest {
                         room,
                         ReservationType.REGULAR,
                         time(2026, 10, 1, 6),
-                        time(2026, 10, 1, 9)
+                        time(2026, 10, 1, 9),
+                        reservationPolicy
                 )
         );
 

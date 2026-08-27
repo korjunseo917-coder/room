@@ -6,7 +6,11 @@ import com.cnu.practiceroom.user.domain.User;
 import com.cnu.practiceroom.user.domain.UserRole;
 import jakarta.persistence.*;
 
-import java.time.*;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -98,7 +102,8 @@ public class Reservation {
             Room room,
             ReservationType type,
             ZonedDateTime start,
-            ZonedDateTime end
+            ZonedDateTime end,
+            ReservationPolicy policy
     ) {
         if (requester == null) {
             throw new IllegalArgumentException(
@@ -130,7 +135,22 @@ public class Reservation {
             );
         }
 
+        if (policy == null) {
+            throw new IllegalArgumentException(
+                    "예약 정책은 필수입니다."
+            );
+        }
 
+        /*
+         * start와 end를 저장하기 전에 예약 시간 규칙을 검사한다.
+         *
+         * 검사 내용:
+         * - 시작과 종료 시각이 null이 아닌지
+         * - 종료가 시작보다 늦은지
+         * - 예약 시각이 슬롯 경계에 맞는지
+         * - 최소 및 최대 이용시간을 지키는지
+         */
+        policy.validateTimeRange(start, end);
 
         this.requester = requester;
         this.club = requester.getClub();
@@ -140,12 +160,19 @@ public class Reservation {
         this.startAt = start.toInstant();
         this.endAt = end.toInstant();
 
+        /*
+         * 예약 신청 시점에 전달받은 정책으로
+         * 운영월별 사용시간을 계산한다.
+         *
+         * 계산한 결과를 예약 자체에 저장하기 때문에
+         * 관리자가 나중에 정책을 변경하더라도
+         * 기존 예약의 사용시간은 바뀌지 않는다.
+         */
         Map<YearMonth, Long> calculatedUsage =
-                new ReservationPolicy()
-                        .calculateUsageMinutesByOperationalMonth(
-                                start,
-                                end
-                        );
+                policy.calculateUsageMinutesByOperationalMonth(
+                        start,
+                        end
+                );
 
         calculatedUsage.forEach(
                 (month, minutes) ->
@@ -167,14 +194,16 @@ public class Reservation {
             Room room,
             ReservationType type,
             ZonedDateTime start,
-            ZonedDateTime end
+            ZonedDateTime end,
+            ReservationPolicy policy
     ) {
         return new Reservation(
                 requester,
                 room,
                 type,
                 start,
-                end
+                end,
+                policy
         );
     }
 
@@ -276,9 +305,7 @@ public class Reservation {
         return displacedBy;
     }
 
-
-    public Map<YearMonth, Long>
-    getUsageMinutesByMonth() {
+    public Map<YearMonth, Long> getUsageMinutesByMonth() {
         Map<YearMonth, Long> result =
                 new LinkedHashMap<>();
 
