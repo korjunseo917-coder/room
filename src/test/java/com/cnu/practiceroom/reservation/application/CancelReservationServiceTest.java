@@ -36,6 +36,7 @@ import static org.springframework.boot.jdbc.test.autoconfigure
         ApplyReservationService.class,
         CancelReservationService.class,
         DisplacedReservationRestorer.class,
+        ReservationOperationLocker.class,
         ReservationApplicationConfiguration.class
 })
 class CancelReservationServiceTest {
@@ -460,7 +461,11 @@ class CancelReservationServiceTest {
     }
 
     private String unique(String prefix) {
-        return prefix + "-" + UUID.randomUUID();
+        return prefix
+                + "-"
+                + UUID.randomUUID()
+                .toString()
+                .replace("-", "");
     }
 
     private ZonedDateTime time(

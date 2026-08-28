@@ -87,6 +87,12 @@ public class Reservation {
     @Column(name = "canceled_at")
     private Instant canceledAt;
 
+    @Column(name = "expired_at")
+    private Instant expiredAt;
+
+    @Column(name = "completed_at")
+    private Instant completedAt;
+
     @Column(name = "displaced_at")
     private Instant displacedAt;
 
@@ -264,6 +270,100 @@ public class Reservation {
                 .toInstant();
     }
 
+    public void approve(
+            User administrator,
+            ZonedDateTime decidedAt,
+            ReservationStatePolicy statePolicy
+    ) {
+        validateAdministrator(administrator);
+        requireStatePolicy(statePolicy);
+
+        ReservationStatus nextStatus = statePolicy.approve(
+                this.status,
+                decidedAt,
+                this.startAt.atZone(SEOUL)
+        );
+
+        this.status = nextStatus;
+        this.decidedBy = administrator;
+        this.decidedAt = decidedAt
+                .withZoneSameInstant(SEOUL)
+                .toInstant();
+        this.rejectionReason = null;
+    }
+
+    public void reject(
+            User administrator,
+            ZonedDateTime decidedAt,
+            String rejectionReason,
+            ReservationStatePolicy statePolicy
+    ) {
+        validateAdministrator(administrator);
+        requireStatePolicy(statePolicy);
+
+        if (rejectionReason == null
+                || rejectionReason.isBlank()) {
+            throw new IllegalArgumentException(
+                    "거절 사유는 필수입니다."
+            );
+        }
+
+        String trimmedReason = rejectionReason.trim();
+
+        if (trimmedReason.length() > 500) {
+            throw new IllegalArgumentException(
+                    "거절 사유는 500자를 넘을 수 없습니다."
+            );
+        }
+
+        ReservationStatus nextStatus = statePolicy.reject(
+                this.status,
+                decidedAt,
+                this.startAt.atZone(SEOUL)
+        );
+
+        this.status = nextStatus;
+        this.decidedBy = administrator;
+        this.decidedAt = decidedAt
+                .withZoneSameInstant(SEOUL)
+                .toInstant();
+        this.rejectionReason = trimmedReason;
+    }
+
+    public void expire(
+            ZonedDateTime expiredAt,
+            ReservationStatePolicy statePolicy
+    ) {
+        requireStatePolicy(statePolicy);
+
+        this.status = statePolicy.expire(
+                this.status,
+                expiredAt,
+                this.startAt.atZone(SEOUL)
+        );
+
+        this.expiredAt = expiredAt
+                .withZoneSameInstant(SEOUL)
+                .toInstant();
+    }
+
+    public void complete(
+            ZonedDateTime completedAt,
+            ReservationStatePolicy statePolicy
+    ) {
+        requireStatePolicy(statePolicy);
+
+        this.status = statePolicy.complete(
+                this.status,
+                completedAt,
+                this.endAt.atZone(SEOUL)
+        );
+
+        this.completedAt = completedAt
+                .withZoneSameInstant(SEOUL)
+                .toInstant();
+    }
+
     public void displace(
             ZonedDateTime displacedAt,
             ReservationStatePolicy statePolicy
@@ -335,6 +435,25 @@ public class Reservation {
                 this.status,
                 this.statusBeforeDisplacement
         );
+    }
+
+    private void validateAdministrator(User administrator) {
+        if (administrator == null
+                || administrator.getRole() != UserRole.ADMIN) {
+            throw new IllegalArgumentException(
+                    "관리자만 예약을 처리할 수 있습니다."
+            );
+        }
+    }
+
+    private void requireStatePolicy(
+            ReservationStatePolicy statePolicy
+    ) {
+        if (statePolicy == null) {
+            throw new IllegalArgumentException(
+                    "예약 상태 정책은 필수입니다."
+            );
+        }
     }
 
     @PrePersist
@@ -423,6 +542,14 @@ public class Reservation {
 
     public Instant getCanceledAt() {
         return canceledAt;
+    }
+
+    public Instant getExpiredAt() {
+        return expiredAt;
+    }
+
+    public Instant getCompletedAt() {
+        return completedAt;
     }
 
     public Instant getDisplacedAt() {

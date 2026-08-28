@@ -108,6 +108,32 @@ public interface ReservationRepository
             @Param("status") ReservationStatus status
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select r
+            from Reservation r
+            where r.status = :status
+              and r.startAt <= :now
+            order by r.startAt, r.id
+            """)
+    List<Reservation> findPendingToExpireForUpdate(
+            @Param("status") ReservationStatus status,
+            @Param("now") Instant now
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select r
+            from Reservation r
+            where r.status = :status
+              and r.endAt <= :now
+            order by r.endAt, r.id
+            """)
+    List<Reservation> findApprovedToCompleteForUpdate(
+            @Param("status") ReservationStatus status,
+            @Param("now") Instant now
+    );
+
     List<Reservation>
     findAllByRequester_IdOrderByStartAtDesc(Long requesterId);
 }

@@ -5,6 +5,8 @@ import com.cnu.practiceroom.reservation.domain.ReservationStatePolicy;
 import com.cnu.practiceroom.reservation.domain.ReservationStatus;
 import com.cnu.practiceroom.reservation.domain.ReservationType;
 import com.cnu.practiceroom.reservation.repository.ReservationRepository;
+import com.cnu.practiceroom.user.domain.User;
+import com.cnu.practiceroom.user.domain.UserRole;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,14 +15,14 @@ import java.util.List;
 import java.util.Set;
 
 @Service
-public class CancelReservationService {
+public class DecideReservationService {
 
     private final ReservationRepository reservationRepository;
     private final ReservationStatePolicy statePolicy;
     private final DisplacedReservationRestorer restorer;
     private final ReservationOperationLocker operationLocker;
 
-    public CancelReservationService(
+    public DecideReservationService(
             ReservationRepository reservationRepository,
             ReservationStatePolicy statePolicy,
             DisplacedReservationRestorer restorer,
@@ -33,12 +35,12 @@ public class CancelReservationService {
     }
 
     @Transactional
-    public CancelReservationResult cancel(
-            CancelReservationCommand command
+    public DecideReservationResult decide(
+            DecideReservationCommand command
     ) {
         if (command == null) {
             throw new IllegalArgumentException(
-                    "예약 취소 정보는 필수입니다."
+                    "예약 처리 정보는 필수입니다."
             );
         }
 
@@ -50,17 +52,13 @@ public class CancelReservationService {
                         )
                 );
 
-        if (!preview.getRequester().getId()
-                .equals(command.requesterId())) {
-
-            throw new IllegalStateException(
-                    "자신이 신청한 예약만 취소할 수 있습니다."
-            );
-        }
-
         List<Reservation> previewCandidates = List.of();
 
-        if (preview.getType() == ReservationType.REGULAR) {
+        if (command.decision()
+                == AdminReservationDecision.REJECT
+                && preview.getType()
+                == ReservationType.REGULAR) {
+
             previewCandidates = reservationRepository
                     .findDisplacedByRegular(
                             preview.getId(),
@@ -68,10 +66,36 @@ public class CancelReservationService {
                     );
         }
 
-        lockAffectedUsers(
-                command.requesterId(),
-                previewCandidates
+        Set<Long> affectedUserIds = new LinkedHashSet<>();
+        affectedUserIds.add(command.administratorId());
+        affectedUserIds.add(preview.getRequester().getId());
+
+        previewCandidates.forEach(
+                reservation -> affectedUserIds.add(
+                        reservation.getRequester().getId()
+                )
         );
+
+        List<User> lockedUsers = operationLocker
+                .lockUsers(affectedUserIds);
+
+        User administrator = lockedUsers.stream()
+                .filter(
+                        user -> user.getId()
+                                .equals(command.administratorId())
+                )
+                .findFirst()
+                .orElseThrow(
+                        () -> new IllegalArgumentException(
+                                "관리자를 찾을 수 없습니다."
+                        )
+                );
+
+        if (administrator.getRole() != UserRole.ADMIN) {
+            throw new IllegalStateException(
+                    "관리자만 예약을 승인하거나 거절할 수 있습니다."
+            );
+        }
 
         operationLocker.lockRoom(
                 preview.getRoom().getId()
@@ -85,57 +109,44 @@ public class CancelReservationService {
                         )
                 );
 
-        if (!reservation.getRequester().getId()
-                .equals(command.requesterId())) {
+        if (command.decision()
+                == AdminReservationDecision.APPROVE) {
 
-            throw new IllegalStateException(
-                    "자신이 신청한 예약만 취소할 수 있습니다."
+            reservation.approve(
+                    administrator,
+                    command.decidedAt(),
+                    statePolicy
+            );
+
+        } else {
+            reservation.reject(
+                    administrator,
+                    command.decidedAt(),
+                    command.rejectionReason(),
+                    statePolicy
             );
         }
 
-        reservation.cancelByRequester(
-                command.canceledAt(),
-                statePolicy
-        );
-
-        /*
-         * 정규예약이 점유하던 시간대를 먼저 비운 뒤
-         * 밀려났던 대기예약의 복구를 시도한다.
-         */
         reservationRepository.flush();
 
         List<Long> restoredReservationIds = List.of();
 
-        if (reservation.getType()
+        if (command.decision()
+                == AdminReservationDecision.REJECT
+                && reservation.getType()
                 == ReservationType.REGULAR) {
 
             restoredReservationIds =
                     restorer.restoreDisplacedBy(
                             reservation,
-                            command.canceledAt()
+                            command.decidedAt()
                     );
         }
 
-        return new CancelReservationResult(
+        return new DecideReservationResult(
                 reservation.getId(),
                 reservation.getStatus(),
                 restoredReservationIds
         );
-    }
-
-    private void lockAffectedUsers(
-            long requesterId,
-            List<Reservation> displacedCandidates
-    ) {
-        Set<Long> userIds = new LinkedHashSet<>();
-        userIds.add(requesterId);
-
-        displacedCandidates.forEach(
-                reservation -> userIds.add(
-                        reservation.getRequester().getId()
-                )
-        );
-
-        operationLocker.lockUsers(userIds);
     }
 }

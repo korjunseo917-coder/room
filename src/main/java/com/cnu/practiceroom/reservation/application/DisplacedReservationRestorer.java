@@ -40,19 +40,19 @@ public class DisplacedReservationRestorer {
     }
 
     public List<Long> restoreDisplacedBy(
-            Reservation canceledRegularReservation,
+            Reservation inactiveRegularReservation,
             ZonedDateTime now
     ) {
-        if (canceledRegularReservation == null
-                || canceledRegularReservation.getId() == null) {
+        if (inactiveRegularReservation == null
+                || inactiveRegularReservation.getId() == null) {
             throw new IllegalArgumentException(
-                    "취소된 정규예약은 필수입니다."
+                    "비활성화된 정규예약은 필수입니다."
             );
         }
 
         List<Reservation> candidates = reservationRepository
                 .findDisplacedByRegularForUpdate(
-                        canceledRegularReservation.getId(),
+                        inactiveRegularReservation.getId(),
                         ReservationStatus.DISPLACED
                 );
 
