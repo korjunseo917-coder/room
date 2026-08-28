@@ -1,6 +1,7 @@
 package com.cnu.practiceroom.reservation.repository;
 
 import com.cnu.practiceroom.club.domain.Club;
+import com.cnu.practiceroom.reservation.domain.ReservationStatePolicy;
 import com.cnu.practiceroom.club.repository.ClubRepository;
 import com.cnu.practiceroom.reservation.domain.Reservation;
 import com.cnu.practiceroom.reservation.domain.ReservationPolicy;
@@ -214,6 +215,92 @@ class ReservationRepositoryTest {
 
         assertThat(secondReservation.getStatus())
                 .isEqualTo(ReservationStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("기존 예약을 취소하면 같은 사용자가 다른 연습실의 동일 시간을 예약할 수 있다")
+    void allowsSameRequesterAfterCancelingPreviousReservation() {
+        User member = createMember();
+
+        Room room321 = findRoom("321");
+        Room room322 = findRoom("322");
+
+        Reservation originalReservation =
+                reservationRepository.saveAndFlush(
+                        Reservation.pending(
+                                member,
+                                room321,
+                                ReservationType.REGULAR,
+                                time(2026, 12, 20, 10),
+                                time(2026, 12, 20, 12),
+                                time(2026, 12, 19, 20),
+                                reservationPolicy
+                        )
+                );
+
+        /*
+         * 신청 마감은 12월 19일 22시다.
+         * 기존 예약을 20시 30분에 취소한다.
+         */
+        originalReservation.cancelByRequester(
+                time(2026, 12, 19, 20)
+                        .plusMinutes(30),
+                new ReservationStatePolicy()
+        );
+
+        /*
+         * CANCELED 상태를 DB에 먼저 반영한다.
+         * 이 flush가 있어야 기존 PENDING 예약이
+         * 사용자 시간대를 계속 점유하는 문제가 생기지 않는다.
+         */
+        reservationRepository.saveAndFlush(
+                originalReservation
+        );
+
+        /*
+         * 같은 사용자가 21시에 322호의 동일 시간을 신청한다.
+         * 아직 마감 전이므로 신청 가능해야 한다.
+         */
+        Reservation replacementReservation =
+                reservationRepository.saveAndFlush(
+                        Reservation.pending(
+                                member,
+                                room322,
+                                ReservationType.REGULAR,
+                                time(2026, 12, 20, 10),
+                                time(2026, 12, 20, 12),
+                                time(2026, 12, 19, 21),
+                                reservationPolicy
+                        )
+                );
+
+        entityManager.clear();
+
+        Reservation canceledReservation =
+                reservationRepository
+                        .findById(originalReservation.getId())
+                        .orElseThrow();
+
+        Reservation newReservation =
+                reservationRepository
+                        .findById(replacementReservation.getId())
+                        .orElseThrow();
+
+        assertThat(canceledReservation.getStatus())
+                .isEqualTo(ReservationStatus.CANCELED);
+
+        assertThat(canceledReservation.getCanceledAt())
+                .isEqualTo(
+                        time(2026, 12, 19, 20)
+                                .plusMinutes(30)
+                                .toInstant()
+                );
+
+        assertThat(newReservation.getStatus())
+                .isEqualTo(ReservationStatus.PENDING);
+
+        assertThat(newReservation.getRoom().getRoomNumber())
+                .isEqualTo("322");
     }
 
     private User createMember() {
