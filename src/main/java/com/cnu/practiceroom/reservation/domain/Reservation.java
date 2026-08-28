@@ -90,6 +90,13 @@ public class Reservation {
     @Column(name = "displaced_at")
     private Instant displacedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(
+            name = "status_before_displacement",
+            length = 20
+    )
+    private ReservationStatus statusBeforeDisplacement;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "displaced_by_id")
     private Reservation displacedBy;
@@ -187,13 +194,15 @@ public class Reservation {
                         end
                 );
 
-        calculatedUsage.forEach(
-                (month, minutes) ->
-                        this.usageMinutesByMonth.put(
-                                month.atDay(1),
-                                minutes
-                        )
-        );
+        if (type == ReservationType.REGULAR) {
+            calculatedUsage.forEach(
+                    (month, minutes) ->
+                            this.usageMinutesByMonth.put(
+                                    month.atDay(1),
+                                    minutes
+                            )
+            );
+        }
 
         this.usageMonth = calculatedUsage
                 .keySet()
@@ -253,6 +262,64 @@ public class Reservation {
         this.canceledAt = canceledAt
                 .withZoneSameInstant(SEOUL)
                 .toInstant();
+    }
+
+    public void displace(
+            ZonedDateTime displacedAt,
+            ReservationStatePolicy statePolicy
+    ) {
+        if (statePolicy == null) {
+            throw new IllegalArgumentException(
+                    "예약 상태 정책은 필수입니다."
+            );
+        }
+
+        ReservationStatus previousStatus = this.status;
+
+        ReservationStatus nextStatus =
+                statePolicy.displaceStandby(
+                        this.type,
+                        this.status
+                );
+
+        if (displacedAt == null) {
+            throw new IllegalArgumentException(
+                    "밀려난 시각은 필수입니다."
+            );
+        }
+
+        this.statusBeforeDisplacement = previousStatus;
+        this.status = nextStatus;
+        this.displacedAt = displacedAt
+                .withZoneSameInstant(SEOUL)
+                .toInstant();
+        this.displacedBy = null;
+    }
+
+    public void recordDisplacedBy(
+            Reservation regularReservation
+    ) {
+        if (this.status != ReservationStatus.DISPLACED) {
+            throw new IllegalStateException(
+                    "밀려난 예약에만 원인 예약을 기록할 수 있습니다."
+            );
+        }
+
+        if (regularReservation == null
+                || regularReservation.getType()
+                != ReservationType.REGULAR) {
+            throw new IllegalArgumentException(
+                    "자신을 밀어낸 정규예약은 필수입니다."
+            );
+        }
+
+        if (regularReservation.getId() == null) {
+            throw new IllegalStateException(
+                    "저장된 정규예약만 밀어낸 예약으로 기록할 수 있습니다."
+            );
+        }
+
+        this.displacedBy = regularReservation;
     }
 
     @PrePersist
@@ -345,6 +412,10 @@ public class Reservation {
 
     public Instant getDisplacedAt() {
         return displacedAt;
+    }
+
+    public ReservationStatus getStatusBeforeDisplacement() {
+        return statusBeforeDisplacement;
     }
 
     public Reservation getDisplacedBy() {

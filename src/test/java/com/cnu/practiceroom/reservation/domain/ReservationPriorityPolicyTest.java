@@ -315,8 +315,7 @@ class ReservationPriorityPolicyTest {
                 displaced,
                 List.of(),
                 true,
-                at(14, 21),
-                at(14, 22)
+                at(14, 21)
         );
 
         assertTrue(result);
@@ -340,8 +339,7 @@ class ReservationPriorityPolicyTest {
                 displaced,
                 List.of(active),
                 true,
-                at(14, 21),
-                at(14, 22)
+                at(14, 21)
         );
 
         assertFalse(result);
@@ -365,25 +363,23 @@ class ReservationPriorityPolicyTest {
                 displaced,
                 List.of(otherRoom),
                 true,
-                at(14, 21),
-                at(14, 22)
+                at(14, 21)
         );
 
         assertFalse(result);
     }
 
     @Test
-    @DisplayName("신청 마감 정각에는 밀려난 예약을 복구할 수 없다")
-    void rejectsRestoreExactlyAtDeadline() {
+    @DisplayName("신청 마감 이후라도 이용 시작 전이면 복구할 수 있다")
+    void restoresAfterDeadlineBeforeStart() {
         boolean result = policy.canRestore(
                 displacedReservation(),
                 List.of(),
                 true,
-                at(14, 22),
-                at(14, 22)
+                at(15, 17)
         );
 
-        assertFalse(result);
+        assertTrue(result);
     }
 
     @Test
@@ -393,8 +389,7 @@ class ReservationPriorityPolicyTest {
                 displacedReservation(),
                 List.of(),
                 false,
-                at(14, 21),
-                at(14, 22)
+                at(14, 21)
         );
 
         assertFalse(result);
@@ -415,8 +410,7 @@ class ReservationPriorityPolicyTest {
                 canceled,
                 List.of(),
                 true,
-                at(14, 21),
-                at(14, 22)
+                at(14, 21)
         );
 
         assertFalse(result);
@@ -440,8 +434,7 @@ class ReservationPriorityPolicyTest {
                 displaced,
                 List.of(canceledRegular),
                 true,
-                at(14, 21),
-                at(14, 22)
+                at(14, 21)
         );
 
         assertTrue(result);

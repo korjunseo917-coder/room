@@ -150,8 +150,7 @@ public final class ReservationPriorityPolicy {
             ReservationSnapshot displacedReservation,
             List<ReservationSnapshot> activeReservations,
             boolean requesterIsActiveMember,
-            ZonedDateTime now,
-            ZonedDateTime applicationDeadline
+            ZonedDateTime now
     ) {
         if (displacedReservation == null) {
             throw new IllegalArgumentException(
@@ -165,9 +164,9 @@ public final class ReservationPriorityPolicy {
             );
         }
 
-        if (now == null || applicationDeadline == null) {
+        if (now == null) {
             throw new IllegalArgumentException(
-                    "현재 시각과 신청 마감 시각은 필수입니다."
+                    "현재 시각은 필수입니다."
             );
         }
 
@@ -182,10 +181,6 @@ public final class ReservationPriorityPolicy {
         }
 
         if (!requesterIsActiveMember) {
-            return false;
-        }
-
-        if (!now.isBefore(applicationDeadline)) {
             return false;
         }
 
