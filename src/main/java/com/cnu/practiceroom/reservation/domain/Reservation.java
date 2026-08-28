@@ -222,6 +222,39 @@ public class Reservation {
         );
     }
 
+    public void cancelByRequester(
+            ZonedDateTime canceledAt,
+            ReservationStatePolicy statePolicy
+    ) {
+        if (statePolicy == null) {
+            throw new IllegalArgumentException(
+                    "예약 상태 정책은 필수입니다."
+            );
+        }
+
+        /*
+         * 상태 정책이 다음 사항을 검사한다.
+         *
+         * - 현재 상태가 PENDING, APPROVED, DISPLACED 중 하나인지
+         * - 취소 시각이 이용 시작 시각보다 이른지
+         */
+        ReservationStatus nextStatus =
+                statePolicy.cancelByRequester(
+                        this.status,
+                        canceledAt,
+                        this.startAt.atZone(SEOUL)
+                );
+
+        /*
+         * 모든 검증이 성공한 뒤에만 상태와 취소 시각을 변경한다.
+         * 검증이 실패하면 기존 상태가 그대로 유지된다.
+         */
+        this.status = nextStatus;
+        this.canceledAt = canceledAt
+                .withZoneSameInstant(SEOUL)
+                .toInstant();
+    }
+
     @PrePersist
     private void beforeInsert() {
         this.updatedAt = Instant.now();

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -159,6 +160,74 @@ class ReservationTest {
         )
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("예약 신청 기간이 마감되었습니다.");
+    }
+
+    @Test
+    @DisplayName("신청자는 이용 시작 전에 예약을 취소할 수 있다")
+    void requesterCanCancelBeforeStart() {
+        User member = activeMember();
+        Room room = activeRoom();
+
+        Reservation reservation = Reservation.pending(
+                member,
+                room,
+                ReservationType.REGULAR,
+                time(2026, 9, 10, 10, 0),
+                time(2026, 9, 10, 12, 0),
+                time(2026, 9, 9, 20, 0),
+                reservationPolicy
+        );
+
+        ZonedDateTime canceledAt =
+                time(2026, 9, 10, 9, 0);
+
+        reservation.cancelByRequester(
+                canceledAt,
+                new ReservationStatePolicy()
+        );
+
+        assertThat(reservation.getStatus())
+                .isEqualTo(ReservationStatus.CANCELED);
+
+        assertThat(reservation.getCanceledAt())
+                .isEqualTo(canceledAt.toInstant());
+    }
+
+    @Test
+    @DisplayName("신청자는 이용 시작 시각부터 직접 취소할 수 없다")
+    void requesterCannotCancelAtStart() {
+        User member = activeMember();
+        Room room = activeRoom();
+
+        Reservation reservation = Reservation.pending(
+                member,
+                room,
+                ReservationType.REGULAR,
+                time(2026, 9, 10, 10, 0),
+                time(2026, 9, 10, 12, 0),
+                time(2026, 9, 9, 20, 0),
+                reservationPolicy
+        );
+
+        assertThatThrownBy(
+                () -> reservation.cancelByRequester(
+                        time(2026, 9, 10, 10, 0),
+                        new ReservationStatePolicy()
+                )
+        )
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage(
+                        "이용 시작 이후에는 신청자가 취소할 수 없습니다."
+                );
+
+        /*
+         * 실패한 취소가 예약 상태를 변경하면 안 된다.
+         */
+        assertThat(reservation.getStatus())
+                .isEqualTo(ReservationStatus.PENDING);
+
+        assertThat(reservation.getCanceledAt())
+                .isNull();
     }
 
     private User activeMember() {
