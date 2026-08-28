@@ -322,6 +322,21 @@ public class Reservation {
         this.displacedBy = regularReservation;
     }
 
+    public void restoreDisplaced(
+            ReservationStatePolicy statePolicy
+    ) {
+        if (statePolicy == null) {
+            throw new IllegalArgumentException(
+                    "예약 상태 정책은 필수입니다."
+            );
+        }
+
+        this.status = statePolicy.restoreDisplaced(
+                this.status,
+                this.statusBeforeDisplacement
+        );
+    }
+
     @PrePersist
     private void beforeInsert() {
         this.updatedAt = Instant.now();

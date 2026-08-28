@@ -130,14 +130,21 @@ public final class ReservationStatePolicy {
     }
 
     public ReservationStatus restoreDisplaced(
-            ReservationStatus currentStatus
+            ReservationStatus currentStatus,
+            ReservationStatus statusBeforeDisplacement
     ) {
         requireStatus(
                 currentStatus,
                 ReservationStatus.DISPLACED
         );
 
-        return ReservationStatus.PENDING;
+        requireStatus(
+                statusBeforeDisplacement,
+                ReservationStatus.PENDING,
+                ReservationStatus.APPROVED
+        );
+
+        return statusBeforeDisplacement;
     }
 
     public ReservationStatus expire(

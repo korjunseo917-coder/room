@@ -177,11 +177,27 @@ class ReservationStatePolicyTest {
     void restoresDisplacedReservation() {
         ReservationStatus result =
                 policy.restoreDisplaced(
-                        ReservationStatus.DISPLACED
+                        ReservationStatus.DISPLACED,
+                        ReservationStatus.PENDING
                 );
 
         assertEquals(
                 ReservationStatus.PENDING,
+                result
+        );
+    }
+
+    @Test
+    @DisplayName("승인 후 밀려난 대기예약은 승인 상태로 복구한다")
+    void restoresApprovedDisplacedReservation() {
+        ReservationStatus result =
+                policy.restoreDisplaced(
+                        ReservationStatus.DISPLACED,
+                        ReservationStatus.APPROVED
+                );
+
+        assertEquals(
+                ReservationStatus.APPROVED,
                 result
         );
     }

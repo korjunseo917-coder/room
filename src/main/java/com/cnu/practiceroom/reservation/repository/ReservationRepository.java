@@ -2,7 +2,9 @@ package com.cnu.practiceroom.reservation.repository;
 
 import com.cnu.practiceroom.reservation.domain.Reservation;
 import com.cnu.practiceroom.reservation.domain.ReservationStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -10,9 +12,16 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface ReservationRepository
         extends JpaRepository<Reservation, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Reservation r where r.id = :id")
+    Optional<Reservation> findByIdForUpdate(
+            @Param("id") Long id
+    );
 
     @Query("""
             select r
@@ -70,6 +79,33 @@ public interface ReservationRepository
     long sumCountedRegularUsageMinutes(
             @Param("clubId") Long clubId,
             @Param("usageMonth") LocalDate usageMonth
+    );
+
+    @Query("""
+            select r
+            from Reservation r
+            where r.displacedBy.id = :regularReservationId
+              and r.status = :status
+            order by r.requestedAt, r.id
+            """)
+    List<Reservation> findDisplacedByRegular(
+            @Param("regularReservationId")
+            Long regularReservationId,
+            @Param("status") ReservationStatus status
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select r
+            from Reservation r
+            where r.displacedBy.id = :regularReservationId
+              and r.status = :status
+            order by r.requestedAt, r.id
+            """)
+    List<Reservation> findDisplacedByRegularForUpdate(
+            @Param("regularReservationId")
+            Long regularReservationId,
+            @Param("status") ReservationStatus status
     );
 
     List<Reservation>
