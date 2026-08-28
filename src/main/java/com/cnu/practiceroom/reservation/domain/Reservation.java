@@ -123,9 +123,27 @@ public class Reservation {
             );
         }
 
+        /*
+         * 비활성화된 회원은 신규 예약을 신청할 수 없다.
+         */
+        if (!requester.isActive()) {
+            throw new IllegalArgumentException(
+                    "비활성화된 사용자는 예약을 신청할 수 없습니다."
+            );
+        }
+
         if (room == null) {
             throw new IllegalArgumentException(
                     "연습실은 필수입니다."
+            );
+        }
+
+        /*
+         * 비활성화된 연습실은 신규 예약을 받을 수 없다.
+         */
+        if (!room.isActive()) {
+            throw new IllegalArgumentException(
+                    "비활성화된 연습실에는 예약을 신청할 수 없습니다."
             );
         }
 
@@ -142,13 +160,12 @@ public class Reservation {
         }
 
         /*
-         * start와 end를 저장하기 전에 예약 시간 규칙을 검사한다.
+         * 예약을 저장하기 전에 시간 규칙을 검사한다.
          *
-         * 검사 내용:
-         * - 시작과 종료 시각이 null이 아닌지
-         * - 종료가 시작보다 늦은지
-         * - 예약 시각이 슬롯 경계에 맞는지
-         * - 최소 및 최대 이용시간을 지키는지
+         * - 시작과 종료 시각 필수
+         * - 종료 시각이 시작 시각보다 늦어야 함
+         * - 설정된 예약 단위 준수
+         * - 최대 이용시간 준수
          */
         policy.validateTimeRange(start, end);
 
@@ -161,12 +178,9 @@ public class Reservation {
         this.endAt = end.toInstant();
 
         /*
-         * 예약 신청 시점에 전달받은 정책으로
-         * 운영월별 사용시간을 계산한다.
-         *
-         * 계산한 결과를 예약 자체에 저장하기 때문에
-         * 관리자가 나중에 정책을 변경하더라도
-         * 기존 예약의 사용시간은 바뀌지 않는다.
+         * 신청 시점에 적용된 정책으로 운영월별 사용시간을 계산한다.
+         * 이 결과를 예약에 저장하므로 이후 정책이 변경되더라도
+         * 기존 예약의 월별 사용시간은 바뀌지 않는다.
          */
         Map<YearMonth, Long> calculatedUsage =
                 policy.calculateUsageMinutesByOperationalMonth(
