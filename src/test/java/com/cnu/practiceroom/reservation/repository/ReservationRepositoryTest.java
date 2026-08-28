@@ -72,6 +72,7 @@ class ReservationRepositoryTest {
                         ReservationType.REGULAR,
                         time(2026, 9, 30, 23),
                         time(2026, 10, 1, 2),
+                        time(2026, 9, 29, 21),
                         reservationPolicy
                 )
         );
@@ -114,6 +115,7 @@ class ReservationRepositoryTest {
                         ReservationType.STANDBY,
                         time(2026, 11, 10, 10),
                         time(2026, 11, 10, 12),
+                        time(2026, 11, 9, 20),
                         reservationPolicy
                 )
         );
@@ -124,6 +126,7 @@ class ReservationRepositoryTest {
                 ReservationType.STANDBY,
                 time(2026, 11, 10, 11),
                 time(2026, 11, 10, 13),
+                time(2026, 11, 9, 21),
                 reservationPolicy
         );
 

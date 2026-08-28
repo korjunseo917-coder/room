@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ReservationTest {
@@ -43,13 +44,16 @@ class ReservationTest {
                         member,
                         room,
                         ReservationType.REGULAR,
-                        time(10),
-                        time(11),
+                        time(2026, 9, 10, 10, 0),
+                        time(2026, 9, 10, 11, 0),
+                        time(2026, 9, 9, 21, 0),
                         reservationPolicy
                 )
         )
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("비활성화된 사용자는 예약을 신청할 수 없습니다.");
+                .hasMessage(
+                        "비활성화된 사용자는 예약을 신청할 수 없습니다."
+                );
     }
 
     @Test
@@ -76,22 +80,118 @@ class ReservationTest {
                         member,
                         room,
                         ReservationType.REGULAR,
-                        time(10),
-                        time(11),
+                        time(2026, 9, 10, 10, 0),
+                        time(2026, 9, 10, 11, 0),
+                        time(2026, 9, 9, 21, 0),
                         reservationPolicy
                 )
         )
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("비활성화된 연습실에는 예약을 신청할 수 없습니다.");
+                .hasMessage(
+                        "비활성화된 연습실에는 예약을 신청할 수 없습니다."
+                );
     }
 
-    private ZonedDateTime time(int hour) {
+    @Test
+    @DisplayName("운영월 예약이 열리기 전에는 신청할 수 없다")
+    void cannotRequestBeforeMonthlyOpening() {
+        User member = activeMember();
+        Room room = activeRoom();
+
+        /*
+         * 9월 운영월은 8월 27일 20시에 열린다.
+         * 그보다 1분 전인 19시 59분 신청은 거절되어야 한다.
+         */
+        assertThatThrownBy(
+                () -> Reservation.pending(
+                        member,
+                        room,
+                        ReservationType.REGULAR,
+                        time(2026, 9, 10, 10, 0),
+                        time(2026, 9, 10, 11, 0),
+                        time(2026, 8, 27, 19, 59),
+                        reservationPolicy
+                )
+        )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("아직 예약 신청 기간이 아닙니다.");
+    }
+
+    @Test
+    @DisplayName("운영월 예약이 열리는 정확한 시각부터 신청할 수 있다")
+    void canRequestAtMonthlyOpening() {
+        User member = activeMember();
+        Room room = activeRoom();
+
+        assertThatCode(
+                () -> Reservation.pending(
+                        member,
+                        room,
+                        ReservationType.REGULAR,
+                        time(2026, 9, 10, 10, 0),
+                        time(2026, 9, 10, 11, 0),
+                        time(2026, 8, 27, 20, 0),
+                        reservationPolicy
+                )
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("신청 마감 시각과 정확히 같으면 신청할 수 없다")
+    void cannotRequestAtApplicationDeadline() {
+        User member = activeMember();
+        Room room = activeRoom();
+
+        /*
+         * 9월 10일 운영일 예약의 마감은
+         * 전날인 9월 9일 22시다.
+         */
+        assertThatThrownBy(
+                () -> Reservation.pending(
+                        member,
+                        room,
+                        ReservationType.REGULAR,
+                        time(2026, 9, 10, 10, 0),
+                        time(2026, 9, 10, 11, 0),
+                        time(2026, 9, 9, 22, 0),
+                        reservationPolicy
+                )
+        )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("예약 신청 기간이 마감되었습니다.");
+    }
+
+    private User activeMember() {
+        Club club = new Club("테스트 동아리");
+
+        return User.member(
+                "active-member",
+                "temporary-password-hash",
+                "활성 회원",
+                club
+        );
+    }
+
+    private Room activeRoom() {
+        return new Room(
+                "321",
+                "321호 연습실"
+        );
+    }
+
+    private ZonedDateTime time(
+            int year,
+            int month,
+            int day,
+            int hour,
+            int minute
+    ) {
         return ZonedDateTime.of(
-                2026,
-                9,
-                10,
+                year,
+                month,
+                day,
                 hour,
-                0,
+                minute,
                 0,
                 0,
                 SEOUL

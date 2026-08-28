@@ -112,6 +112,7 @@ class MonthlyQuotaPersistenceTest {
                         ReservationType.REGULAR,
                         time(2026, 10, 1, 6),
                         time(2026, 10, 1, 9),
+                        time(2026, 9, 29, 21),
                         reservationPolicy
                 )
         );

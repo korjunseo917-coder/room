@@ -103,6 +103,7 @@ public class Reservation {
             ReservationType type,
             ZonedDateTime start,
             ZonedDateTime end,
+            ZonedDateTime requestedAt,
             ReservationPolicy policy
     ) {
         if (requester == null) {
@@ -123,9 +124,6 @@ public class Reservation {
             );
         }
 
-        /*
-         * 비활성화된 회원은 신규 예약을 신청할 수 없다.
-         */
         if (!requester.isActive()) {
             throw new IllegalArgumentException(
                     "비활성화된 사용자는 예약을 신청할 수 없습니다."
@@ -138,9 +136,6 @@ public class Reservation {
             );
         }
 
-        /*
-         * 비활성화된 연습실은 신규 예약을 받을 수 없다.
-         */
         if (!room.isActive()) {
             throw new IllegalArgumentException(
                     "비활성화된 연습실에는 예약을 신청할 수 없습니다."
@@ -160,14 +155,16 @@ public class Reservation {
         }
 
         /*
-         * 예약을 저장하기 전에 시간 규칙을 검사한다.
+         * 예약 시간 범위와 신청 가능 기간을 함께 검사한다.
          *
-         * - 시작과 종료 시각 필수
-         * - 종료 시각이 시작 시각보다 늦어야 함
-         * - 설정된 예약 단위 준수
-         * - 최대 이용시간 준수
+         * requestedAt은 신청 버튼을 누른 시각이고,
+         * start와 end는 실제 연습실 이용 시간이다.
          */
-        policy.validateTimeRange(start, end);
+        policy.validateApplicationTime(
+                requestedAt,
+                start,
+                end
+        );
 
         this.requester = requester;
         this.club = requester.getClub();
@@ -176,11 +173,13 @@ public class Reservation {
         this.status = ReservationStatus.PENDING;
         this.startAt = start.toInstant();
         this.endAt = end.toInstant();
+        this.requestedAt = requestedAt
+                .withZoneSameInstant(SEOUL)
+                .toInstant();
 
         /*
-         * 신청 시점에 적용된 정책으로 운영월별 사용시간을 계산한다.
-         * 이 결과를 예약에 저장하므로 이후 정책이 변경되더라도
-         * 기존 예약의 월별 사용시간은 바뀌지 않는다.
+         * 신청 당시 정책으로 운영월별 사용시간을 계산하고 저장한다.
+         * 이후 관리자가 정책을 바꿔도 이 예약의 계산 결과는 유지된다.
          */
         Map<YearMonth, Long> calculatedUsage =
                 policy.calculateUsageMinutesByOperationalMonth(
@@ -209,6 +208,7 @@ public class Reservation {
             ReservationType type,
             ZonedDateTime start,
             ZonedDateTime end,
+            ZonedDateTime requestedAt,
             ReservationPolicy policy
     ) {
         return new Reservation(
@@ -217,15 +217,14 @@ public class Reservation {
                 type,
                 start,
                 end,
+                requestedAt,
                 policy
         );
     }
 
     @PrePersist
     private void beforeInsert() {
-        Instant now = Instant.now();
-        this.requestedAt = now;
-        this.updatedAt = now;
+        this.updatedAt = Instant.now();
     }
 
     @PreUpdate
