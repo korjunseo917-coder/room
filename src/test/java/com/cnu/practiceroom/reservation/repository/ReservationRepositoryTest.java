@@ -135,6 +135,87 @@ class ReservationRepositoryTest {
         ).isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @Test
+    @DisplayName("같은 사용자는 서로 다른 연습실을 같은 시간에 예약할 수 없다")
+
+    void rejectsSameRequesterOverlappingDifferentRooms() {
+        User member = createMember();
+
+        Room room321 = findRoom("321");
+        Room room322 = findRoom("322");
+
+        reservationRepository.saveAndFlush(
+                Reservation.pending(
+                        member,
+                        room321,
+                        ReservationType.REGULAR,
+                        time(2026, 12, 10, 10),
+                        time(2026, 12, 10, 12),
+                        time(2026, 12, 9, 20),
+                        reservationPolicy
+                )
+        );
+
+        Reservation overlapping = Reservation.pending(
+                member,
+                room322,
+                ReservationType.STANDBY,
+                time(2026, 12, 10, 11),
+                time(2026, 12, 10, 13),
+                time(2026, 12, 9, 21),
+                reservationPolicy
+        );
+
+        assertThatThrownBy(
+                () -> reservationRepository.saveAndFlush(overlapping)
+        ).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("서로 다른 사용자는 서로 다른 연습실을 같은 시간에 예약할 수 있다")
+    void allowsDifferentRequestersInDifferentRooms() {
+        User firstMember = createMember();
+        User secondMember = createMember();
+
+        Room room321 = findRoom("321");
+        Room room322 = findRoom("322");
+
+        Reservation firstReservation =
+                reservationRepository.saveAndFlush(
+                        Reservation.pending(
+                                firstMember,
+                                room321,
+                                ReservationType.REGULAR,
+                                time(2026, 12, 15, 10),
+                                time(2026, 12, 15, 12),
+                                time(2026, 12, 14, 20),
+                                reservationPolicy
+                        )
+                );
+
+        Reservation secondReservation =
+                reservationRepository.saveAndFlush(
+                        Reservation.pending(
+                                secondMember,
+                                room322,
+                                ReservationType.REGULAR,
+                                time(2026, 12, 15, 10),
+                                time(2026, 12, 15, 12),
+                                time(2026, 12, 14, 20),
+                                reservationPolicy
+                        )
+                );
+
+        assertThat(firstReservation.getId()).isNotNull();
+        assertThat(secondReservation.getId()).isNotNull();
+
+        assertThat(firstReservation.getStatus())
+                .isEqualTo(ReservationStatus.PENDING);
+
+        assertThat(secondReservation.getStatus())
+                .isEqualTo(ReservationStatus.PENDING);
+    }
+
     private User createMember() {
         String uniqueValue = UUID.randomUUID().toString();
 
